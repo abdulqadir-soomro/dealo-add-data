@@ -291,12 +291,19 @@ app.post('/api/upload/preview', upload.single('file'), async (req, res) => {
 // Save route
 app.post('/api/upload/save', async (req, res) => {
     try {
-        const { data, headers } = req.body;
+        const { data, headers, categoryId, brandId } = req.body;
 
         if (!data || !Array.isArray(data)) {
             return res.status(400).json({ 
                 success: false, 
                 error: 'Invalid data format' 
+            });
+        }
+
+        if (!categoryId || !brandId) {
+            return res.status(400).json({
+                success: false,
+                error: 'Category and Brand IDs are required'
             });
         }
 
@@ -340,8 +347,8 @@ app.post('/api/upload/save', async (req, res) => {
                         { size: record['variants(size)5'], color: record['variants(color)5'] },
                         { size: record['variants(size)6'], color: record['variants(color)6'] }
                     ].filter(variant => variant.size && variant.color),
-                    categoryId: record.categoryId || global.defaultCategoryId,
-                    brandId: record.brandId || global.defaultBrandId,
+                    categoryId: categoryId,
+                    brandId: brandId,
                     badge: record['badge 5'] || '',
                     brand: record.brand || ''
                 };
@@ -488,23 +495,73 @@ app.get('/api/categories', async (req, res) => {
 
 app.post('/api/categories', async (req, res) => {
     try {
-        const { categoryName, categoryType, subCategory } = req.body;
-        
-        if (!categoryName) {
-            return res.status(400).json({ success: false, error: 'Category name is required' });
+        // Check MongoDB connection
+        if (mongoose.connection.readyState !== 1) {
+            console.error('Database not connected. Current state:', mongoose.connection.readyState);
+            throw new Error('Database connection is not established');
         }
 
-        const category = new Category({
-            categoryName,
-            categoryType,
-            subCategory
+        const { categoryName, categoryType, subCategory } = req.body;
+        console.log('Received category data:', { categoryName, categoryType, subCategory });
+        
+        if (!categoryName || categoryName.trim() === '') {
+            return res.status(400).json({ 
+                success: false, 
+                error: 'Category name is required and cannot be empty' 
+            });
+        }
+
+        // Trim the input values
+        const trimmedCategoryName = categoryName.trim();
+        const trimmedCategoryType = categoryType ? categoryType.trim() : '';
+        const trimmedSubCategory = subCategory ? subCategory.trim() : '';
+
+        console.log('Creating category with trimmed values:', {
+            categoryName: trimmedCategoryName,
+            categoryType: trimmedCategoryType,
+            subCategory: trimmedSubCategory
         });
 
+        // Create category without checking for duplicates
+        const category = new Category({
+            categoryName: trimmedCategoryName,
+            categoryType: trimmedCategoryType,
+            subCategory: trimmedSubCategory
+        });
+
+        console.log('Saving category to database...');
         await category.save();
+        console.log('Category saved successfully:', category);
+        
         res.status(201).json(category);
     } catch (error) {
-        console.error('Error creating category:', error);
-        res.status(500).json({ success: false, error: 'Error creating category' });
+        console.error('Detailed error creating category:', {
+            message: error.message,
+            stack: error.stack,
+            code: error.code,
+            name: error.name
+        });
+        
+        // If it's a duplicate key error, try to save anyway
+        if (error.code === 11000) {
+            try {
+                const category = new Category({
+                    categoryName: req.body.categoryName.trim(),
+                    categoryType: req.body.categoryType ? req.body.categoryType.trim() : '',
+                    subCategory: req.body.subCategory ? req.body.subCategory.trim() : ''
+                });
+                await category.save();
+                return res.status(201).json(category);
+            } catch (retryError) {
+                console.error('Error on retry:', retryError);
+            }
+        }
+        
+        res.status(500).json({ 
+            success: false, 
+            error: 'Error creating category',
+            details: error.message 
+        });
     }
 });
 
@@ -711,36 +768,8 @@ mongoose.connect('mongodb://localhost:27017/offers', {
     useNewUrlParser: true,
     useUnifiedTopology: true
 })
-.then(async () => {
+.then(() => {
     console.log('Connected to MongoDB successfully');
-    
-    // Create default category and brand if they don't exist
-    try {
-        const defaultCategory = await Category.findOneAndUpdate(
-            { categoryName: 'Default Category' },
-            { 
-                categoryName: 'Default Category',
-                categoryType: 'General',
-                subCategory: 'Default'
-            },
-            { upsert: true, new: true }
-        );
-        
-        const defaultBrand = await Brand.findOneAndUpdate(
-            { name: 'Default Brand' },
-            { name: 'Default Brand', description: 'Default brand for offers' },
-            { upsert: true, new: true }
-        );
-        
-        console.log('Default category and brand created/verified');
-        
-        // Store default IDs for later use
-        global.defaultCategoryId = defaultCategory._id;
-        global.defaultBrandId = defaultBrand._id;
-    } catch (error) {
-        console.error('Error creating default category/brand:', error);
-    }
-    
     app.listen(port, () => {
         console.log(`Server is running on port ${port}`);
         console.log(`Upload page available at: http://localhost:${port}/upload.html`);
@@ -749,4 +778,19 @@ mongoose.connect('mongodb://localhost:27017/offers', {
 .catch((error) => {
     console.error('MongoDB connection error:', error);
     process.exit(1);
+});
+
+// Add connection error handler
+mongoose.connection.on('error', (err) => {
+    console.error('MongoDB connection error:', err);
+});
+
+// Add disconnection handler
+mongoose.connection.on('disconnected', () => {
+    console.log('MongoDB disconnected');
+});
+
+// Add reconnection handler
+mongoose.connection.on('reconnected', () => {
+    console.log('MongoDB reconnected');
 }); 

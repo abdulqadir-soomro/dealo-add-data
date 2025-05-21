@@ -188,16 +188,27 @@
                 <div class="card">
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <h5 class="card-title mb-0">Offers List</h5>
-                        <div class="input-group" style="width: 300px;">
-                            <input type="text" class="form-control" id="searchOffer" placeholder="Search offers...">
-                            <button class="btn btn-outline-secondary" type="button" id="searchButton">
-                                <i class="fas fa-search"></i>
-                            </button>
+                        <div class="d-flex align-items-center">
+                            <a href="all-offers.html" target="_blank" class="btn btn-outline-primary me-3">
+                                <i class="fas fa-external-link-alt"></i> View All
+                            </a>
+                            <div class="input-group" style="width: 300px;">
+                                <input type="text" class="form-control" id="searchOffer" placeholder="Search offers...">
+                                <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                    <i class="fas fa-search"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
                     <div class="card-body">
                         <div class="row" id="offersList">
                             <!-- Offers will be loaded here -->
+                        </div>
+                        <div class="text-center mt-4" id="loadMoreContainer">
+                            <button class="btn btn-primary" id="loadMoreBtn" onclick="loadMoreOffers()">
+                                <i class="fas fa-spinner fa-spin d-none" id="loadMoreSpinner"></i>
+                                See More
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -207,6 +218,11 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        let currentPage = 1;
+        const offersPerPage = 10;
+        let allOffers = [];
+        let filteredOffers = [];
+
         // Show loading spinner
         function showLoading() {
             document.querySelector('.loading').style.display = 'flex';
@@ -251,77 +267,14 @@
             }
         }
 
-        // Load all offers
+        // Load offers with pagination
         async function loadOffers() {
             showLoading();
             try {
                 const response = await fetch('/api/offers');
-                const data = await response.json();
-                const offersList = document.getElementById('offersList');
-                offersList.innerHTML = '';
-
-                data.forEach(offer => {
-                    const variantsHtml = offer.variants && offer.variants.length > 0
-                        ? `<div class="mt-2">
-                            <small class="text-muted">Variants:</small><br>
-                            ${offer.variants.map(v => 
-                                `<span class="badge bg-secondary me-1">${v.size} - ${v.color}</span>`
-                            ).join('')}
-                           </div>`
-                        : '';
-
-                    const offerCard = `
-                        <div class="col-md-6 mb-3">
-                            <div class="card offer-card">
-                                <div class="card-body">
-                                    <div id="carousel-${offer._id}" class="carousel slide mb-3" data-bs-ride="carousel">
-                                        <div class="carousel-inner">
-                                            ${offer.imageUrl.map((url, index) => `
-                                                <div class="carousel-item ${index === 0 ? 'active' : ''}">
-                                                    <img src="${url}" alt="${offer.title}" class="offer-image">
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                        ${offer.imageUrl.length > 1 ? `
-                                            <button class="carousel-control-prev" type="button" data-bs-target="#carousel-${offer._id}" data-bs-slide="prev">
-                                                <span class="carousel-control-prev-icon"></span>
-                                            </button>
-                                            <button class="carousel-control-next" type="button" data-bs-target="#carousel-${offer._id}" data-bs-slide="next">
-                                                <span class="carousel-control-next-icon"></span>
-                                            </button>
-                                        ` : ''}
-                                    </div>
-                                    <h5 class="card-title">${offer.title}</h5>
-                                    <p class="card-text">
-                                        <small class="text-muted">ID: ${offer._id}</small><br>
-                                        ${offer.description || 'No description'}<br>
-                                        <strong>Discount: ${offer.discountPercentage}%</strong><br>
-                                        <strong>Price: ₹${offer.actualPrice} → ₹${offer.discountedPrice}</strong>
-                                        ${variantsHtml}
-                                    </p>
-                                    <div class="mt-3">
-                                        <button class="btn btn-sm btn-primary edit-offer" data-id="${offer._id}">
-                                            <i class="fas fa-edit"></i> Edit
-                                        </button>
-                                        <button class="btn btn-sm btn-danger delete-offer" data-id="${offer._id}">
-                                            <i class="fas fa-trash"></i> Delete
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                    offersList.innerHTML += offerCard;
-                });
-
-                // Add event listeners for edit and delete buttons
-                document.querySelectorAll('.edit-offer').forEach(button => {
-                    button.addEventListener('click', () => editOffer(button.dataset.id));
-                });
-
-                document.querySelectorAll('.delete-offer').forEach(button => {
-                    button.addEventListener('click', () => deleteOffer(button.dataset.id));
-                });
+                allOffers = await response.json();
+                filteredOffers = [...allOffers];
+                displayOffers();
             } catch (error) {
                 console.error('Error loading offers:', error);
                 alert('Error loading offers. Please try again.');
@@ -329,6 +282,108 @@
                 hideLoading();
             }
         }
+
+        // Display offers for current page
+        function displayOffers() {
+            const offersList = document.getElementById('offersList');
+            const startIndex = 0;
+            const endIndex = currentPage * offersPerPage;
+            const offersToShow = filteredOffers.slice(startIndex, endIndex);
+
+            if (currentPage === 1) {
+                offersList.innerHTML = '';
+            }
+
+            offersToShow.forEach(offer => {
+                const offerCard = `
+                    <div class="col-md-6 mb-3">
+                        <div class="card offer-card">
+                            <div class="card-body">
+                                <h5 class="card-title">${offer.title}</h5>
+                                <p class="card-text">
+                                    <small class="text-muted">ID: ${offer._id}</small><br>
+                                    Description: ${offer.description || 'Not set'}<br>
+                                    Discount: ${offer.discountPercentage}%<br>
+                                    Price: ${offer.actualPrice} → ${offer.discountedPrice}<br>
+                                    Brand: ${offer.brandId ? offer.brandId.name : 'Not set'}<br>
+                                    Category: ${offer.categoryId ? offer.categoryId.categoryName : 'Not set'}
+                                </p>
+                                ${offer.imageUrl && offer.imageUrl.length > 0 ? `
+                                    <div id="carousel-${offer._id}" class="carousel slide mb-3" data-bs-ride="carousel">
+                                        <div class="carousel-inner">
+                                            ${offer.imageUrl.map((url, index) => `
+                                                <div class="carousel-item ${index === 0 ? 'active' : ''}">
+                                                    <img src="${url}" class="d-block w-100" alt="Offer image" 
+                                                         style="height: 200px; object-fit: cover;">
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        ${offer.imageUrl.length > 1 ? `
+                                            <button class="carousel-control-prev" type="button" 
+                                                    data-bs-target="#carousel-${offer._id}" data-bs-slide="prev">
+                                                <span class="carousel-control-prev-icon"></span>
+                                            </button>
+                                            <button class="carousel-control-next" type="button" 
+                                                    data-bs-target="#carousel-${offer._id}" data-bs-slide="next">
+                                                <span class="carousel-control-next-icon"></span>
+                                            </button>
+                                        ` : ''}
+                                    </div>
+                                ` : ''}
+                                <div class="mt-3">
+                                    <button class="btn btn-sm btn-primary edit-offer" data-id="${offer._id}">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </button>
+                                    <button class="btn btn-sm btn-danger delete-offer" data-id="${offer._id}">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                offersList.innerHTML += offerCard;
+            });
+
+            // Show/hide load more button
+            const loadMoreBtn = document.getElementById('loadMoreBtn');
+            if (endIndex >= filteredOffers.length) {
+                loadMoreBtn.style.display = 'none';
+            } else {
+                loadMoreBtn.style.display = 'inline-block';
+            }
+
+            // Add event listeners for edit and delete buttons
+            document.querySelectorAll('.edit-offer').forEach(button => {
+                button.addEventListener('click', () => editOffer(button.dataset.id));
+            });
+
+            document.querySelectorAll('.delete-offer').forEach(button => {
+                button.addEventListener('click', () => deleteOffer(button.dataset.id));
+            });
+        }
+
+        // Load more offers
+        function loadMoreOffers() {
+            const spinner = document.getElementById('loadMoreSpinner');
+            spinner.classList.remove('d-none');
+            
+            currentPage++;
+            displayOffers();
+            
+            spinner.classList.add('d-none');
+        }
+
+        // Search offers
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchOffer').value.toLowerCase();
+            filteredOffers = allOffers.filter(offer => 
+                offer.title.toLowerCase().includes(searchTerm) ||
+                (offer.description && offer.description.toLowerCase().includes(searchTerm))
+            );
+            currentPage = 1;
+            displayOffers();
+        });
 
         // Add new offer
         document.getElementById('offerForm').addEventListener('submit', async (e) => {
@@ -415,23 +470,6 @@
             } finally {
                 hideLoading();
             }
-        });
-
-        // Search offers
-        document.getElementById('searchButton').addEventListener('click', () => {
-            const searchTerm = document.getElementById('searchOffer').value.toLowerCase();
-            const offerCards = document.querySelectorAll('.offer-card');
-            
-            offerCards.forEach(card => {
-                const title = card.querySelector('.card-title').textContent.toLowerCase();
-                const description = card.querySelector('.card-text').textContent.toLowerCase();
-                
-                if (title.includes(searchTerm) || description.includes(searchTerm)) {
-                    card.closest('.col-md-6').style.display = '';
-                } else {
-                    card.closest('.col-md-6').style.display = 'none';
-                }
-            });
         });
 
         // Add new image URL field

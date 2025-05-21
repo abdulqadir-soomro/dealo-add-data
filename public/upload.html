@@ -110,7 +110,7 @@
                                     <button onclick="showColumnModal()" class="btn btn-secondary me-2">
                                         Edit Columns
                                     </button>
-                                    <button onclick="saveToDatabase()" class="btn btn-success">
+                                    <button onclick="showSaveModal()" class="btn btn-success">
                                         Save to Database
                                     </button>
                                 </div>
@@ -118,6 +118,36 @@
                             <div id="previewTable" class="table-responsive"></div>
                         </div>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Save Modal -->
+    <div class="modal fade" id="saveModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Save Data</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="categorySelect" class="form-label">Select Category</label>
+                        <select class="form-select" id="categorySelect" required>
+                            <option value="">Choose a category...</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label for="brandSelect" class="form-label">Select Brand</label>
+                        <select class="form-select" id="brandSelect" required>
+                            <option value="">Choose a brand...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="saveToDatabase()">Save</button>
                 </div>
             </div>
         </div>
@@ -427,61 +457,99 @@
             previewSection.classList.remove('d-none');
         }
 
-        function saveToDatabase() {
-            if (!parsedData || parsedData.length === 0) {
-                showError('No data to save');
+        // Load categories and brands
+        async function loadCategoriesAndBrands() {
+            try {
+                // Load categories
+                const categoriesResponse = await fetch('/api/categories');
+                const categories = await categoriesResponse.json();
+                const categorySelect = document.getElementById('categorySelect');
+                categorySelect.innerHTML = '<option value="">Choose a category...</option>' +
+                    categories.map(category => 
+                        `<option value="${category._id}">${category.categoryName}</option>`
+                    ).join('');
+
+                // Load brands
+                const brandsResponse = await fetch('/api/brands');
+                const brands = await brandsResponse.json();
+                const brandSelect = document.getElementById('brandSelect');
+                brandSelect.innerHTML = '<option value="">Choose a brand...</option>' +
+                    brands.map(brand => 
+                        `<option value="${brand._id}">${brand.name}</option>`
+                    ).join('');
+            } catch (error) {
+                console.error('Error loading categories and brands:', error);
+                alert('Error loading categories and brands. Please try again.');
+            }
+        }
+
+        // Show save modal
+        function showSaveModal() {
+            const saveModal = new bootstrap.Modal(document.getElementById('saveModal'));
+            saveModal.show();
+        }
+
+        // Save to database
+        async function saveToDatabase() {
+            const categoryId = document.getElementById('categorySelect').value;
+            const brandId = document.getElementById('brandSelect').value;
+
+            console.log('Selected Category ID:', categoryId);
+            console.log('Selected Brand ID:', brandId);
+            console.log('Data to save:', parsedData);
+
+            if (!categoryId || !brandId) {
+                alert('Please select both a category and a brand');
                 return;
             }
 
-            // Show saving status
-            uploadStatus.classList.remove('d-none');
-            uploadStatus.innerHTML = `
-                <div class="d-flex align-items-center">
-                    <div class="spinner-border spinner-border-sm me-2" role="status">
-                        <span class="visually-hidden">Loading...</span>
-                    </div>
-                    <span>Saving ${parsedData.length} records to database...</span>
-                </div>
-            `;
+            if (!parsedData || parsedData.length === 0) {
+                alert('No data to save. Please upload a file first.');
+                return;
+            }
 
-            // Send data to server
-            fetch('/api/upload/save', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                    data: parsedData,
-                    headers: currentHeaders
-                })
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(result => {
+            showLoading();
+            try {
+                console.log('Sending data to server...');
+                const response = await fetch('/api/upload/save', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        data: parsedData,
+                        headers: currentHeaders,
+                        categoryId,
+                        brandId
+                    })
+                });
+
+                console.log('Server response status:', response.status);
+                const result = await response.json();
+                console.log('Server response:', result);
+
                 if (result.success) {
-                    uploadStatus.innerHTML = `
-                        <div class="text-green-600">
-                            <p>✓ Successfully saved ${result.count} records to database!</p>
-                            ${result.errors && result.errors.length > 0 ? `
-                                <p class="text-sm text-yellow-600">
-                                    ${result.errors.length} records had errors and were not saved.
-                                </p>
-                            ` : ''}
-                        </div>
-                    `;
+                    alert('Data saved successfully!');
+                    window.location.reload();
                 } else {
                     throw new Error(result.error || 'Failed to save data');
                 }
-            })
-            .catch(error => {
-                console.error('Save error:', error);
-                showError(`Error saving to database: ${error.message}`);
-                uploadStatus.classList.add('d-none');
-            });
+            } catch (error) {
+                console.error('Error saving data:', error);
+                alert('Error saving data: ' + error.message);
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Show loading spinner
+        function showLoading() {
+            document.querySelector('.loading').style.display = 'flex';
+        }
+
+        // Hide loading spinner
+        function hideLoading() {
+            document.querySelector('.loading').style.display = 'none';
         }
 
         function showError(message) {
@@ -489,6 +557,11 @@
             uploadResult.className = 'mt-4 p-4 rounded-md bg-red-100 text-red-700';
             uploadResult.textContent = message;
         }
+
+        // Load categories and brands when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            loadCategoriesAndBrands();
+        });
     </script>
 </body>
 </html> 
