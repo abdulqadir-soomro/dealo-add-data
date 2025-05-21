@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Category Management</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .category-card {
+            transition: transform 0.2s;
+        }
+        .category-card:hover {
+            transform: translateY(-5px);
+        }
+        .category-icon {
+            width: 100px;
+            height: 100px;
+            object-fit: contain;
+        }
+        .loading {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.8);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+    </style>
+</head>
+<body>
+    <div class="loading">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+        <div class="container">
+            <a class="navbar-brand" href="#">Offer Management</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav">
+                    <li class="nav-item">
+                        <a class="nav-link" href="upload.html">
+                            <i class="fas fa-upload"></i> Upload Offers
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="brands.html">
+                            <i class="fas fa-trademark"></i> Brands
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link active" href="categories.html">
+                            <i class="fas fa-tags"></i> Categories
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="offers.html">
+                            <i class="fas fa-gift"></i> Offers
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="card-title mb-0">Add New Category</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="addCategoryForm" class="mb-4">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="categoryName" class="form-label">Category Name</label>
+                                        <input type="text" class="form-control" id="categoryName" required>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="categoryType" class="form-label">Category Type</label>
+                                        <input type="text" class="form-control" id="categoryType">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="mb-3">
+                                        <label for="subCategory" class="form-label">Sub Category</label>
+                                        <input type="text" class="form-control" id="subCategory">
+                                    </div>
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Add Category</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="card-title mb-0">Categories List</h5>
+                        <div class="input-group" style="width: 300px;">
+                            <input type="text" class="form-control" id="searchCategory" placeholder="Search categories...">
+                            <button class="btn btn-outline-secondary" type="button" id="searchButton">
+                                <i class="fas fa-search"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="row" id="categoriesList">
+                            <!-- Categories will be loaded here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Edit Category Modal -->
+    <div class="modal fade" id="editCategoryModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Edit Category</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="editCategoryForm">
+                        <input type="hidden" id="editCategoryId">
+                        <div class="mb-3">
+                            <label for="editCategoryName" class="form-label">Category Name</label>
+                            <input type="text" class="form-control" id="editCategoryName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="editCategoryType" class="form-label">Category Type</label>
+                            <input type="text" class="form-control" id="editCategoryType">
+                        </div>
+                        <div class="mb-3">
+                            <label for="editSubCategory" class="form-label">Sub Category</label>
+                            <input type="text" class="form-control" id="editSubCategory">
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" id="saveEditCategory">Save Changes</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Show loading spinner
+        function showLoading() {
+            document.querySelector('.loading').style.display = 'flex';
+        }
+
+        // Hide loading spinner
+        function hideLoading() {
+            document.querySelector('.loading').style.display = 'none';
+        }
+
+        // Load all categories
+        async function loadCategories() {
+            showLoading();
+            try {
+                const response = await fetch('/api/categories');
+                const categories = await response.json();
+                const categoriesList = document.getElementById('categoriesList');
+                categoriesList.innerHTML = categories.map(category => `
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h5 class="card-title">${category.categoryName}</h5>
+                            <p class="card-text">
+                                <strong>Type:</strong> ${category.categoryType || 'Not specified'}<br>
+                                <strong>Sub Category:</strong> ${category.subCategory || 'Not specified'}
+                            </p>
+                            <div class="btn-group">
+                                <button class="btn btn-sm btn-primary edit-category" data-id="${category._id}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </button>
+                                <button class="btn btn-sm btn-danger delete-category" data-id="${category._id}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                `).join('');
+
+                // Add event listeners for edit and delete buttons
+                document.querySelectorAll('.edit-category').forEach(button => {
+                    button.addEventListener('click', () => editCategory(button.dataset.id));
+                });
+
+                document.querySelectorAll('.delete-category').forEach(button => {
+                    button.addEventListener('click', () => deleteCategory(button.dataset.id));
+                });
+            } catch (error) {
+                console.error('Error loading categories:', error);
+                alert('Error loading categories. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Add new category
+        document.getElementById('addCategoryForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const categoryName = document.getElementById('categoryName').value;
+            const categoryType = document.getElementById('categoryType').value;
+            const subCategory = document.getElementById('subCategory').value;
+
+            try {
+                const response = await fetch('/api/categories', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ categoryName, categoryType, subCategory })
+                });
+
+                if (response.ok) {
+                    document.getElementById('addCategoryForm').reset();
+                    loadCategories();
+                } else {
+                    throw new Error('Failed to add category');
+                }
+            } catch (error) {
+                console.error('Error adding category:', error);
+                alert('Error adding category. Please try again.');
+            }
+        });
+
+        // Edit category
+        async function editCategory(id) {
+            showLoading();
+            try {
+                const response = await fetch(`/api/categories/${id}`);
+                const category = await response.json();
+
+                document.getElementById('editCategoryId').value = category._id;
+                document.getElementById('editCategoryName').value = category.categoryName;
+                document.getElementById('editCategoryType').value = category.categoryType || '';
+                document.getElementById('editSubCategory').value = category.subCategory || '';
+
+                const editModal = new bootstrap.Modal(document.getElementById('editCategoryModal'));
+                editModal.show();
+            } catch (error) {
+                console.error('Error loading category details:', error);
+                alert('Error loading category details. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Save edited category
+        document.getElementById('saveEditCategory').addEventListener('click', async () => {
+            showLoading();
+            const categoryId = document.getElementById('editCategoryId').value;
+            const categoryName = document.getElementById('editCategoryName').value;
+            const categoryType = document.getElementById('editCategoryType').value;
+            const subCategory = document.getElementById('editSubCategory').value;
+
+            try {
+                const response = await fetch(`/api/categories/${categoryId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ categoryName, categoryType, subCategory })
+                });
+
+                if (response.ok) {
+                    const editModal = bootstrap.Modal.getInstance(document.getElementById('editCategoryModal'));
+                    editModal.hide();
+                    loadCategories();
+                } else {
+                    throw new Error('Failed to update category');
+                }
+            } catch (error) {
+                console.error('Error updating category:', error);
+                alert('Error updating category. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        });
+
+        // Delete category
+        async function deleteCategory(id) {
+            if (!confirm('Are you sure you want to delete this category?')) {
+                return;
+            }
+
+            showLoading();
+            try {
+                const response = await fetch(`/api/categories/${id}`, {
+                    method: 'DELETE'
+                });
+
+                if (response.ok) {
+                    loadCategories();
+                    alert('Category deleted successfully!');
+                } else {
+                    throw new Error('Failed to delete category');
+                }
+            } catch (error) {
+                console.error('Error deleting category:', error);
+                alert('Error deleting category. Please try again.');
+            } finally {
+                hideLoading();
+            }
+        }
+
+        // Search categories
+        document.getElementById('searchButton').addEventListener('click', () => {
+            const searchTerm = document.getElementById('searchCategory').value.toLowerCase();
+            const categoryCards = document.querySelectorAll('.category-card');
+            
+            categoryCards.forEach(card => {
+                const categoryName = card.querySelector('.card-title').textContent.toLowerCase();
+                const categoryDescription = card.querySelector('.card-text').textContent.toLowerCase();
+                
+                if (categoryName.includes(searchTerm) || categoryDescription.includes(searchTerm)) {
+                    card.closest('.col-md-6').style.display = '';
+                } else {
+                    card.closest('.col-md-6').style.display = 'none';
+                }
+            });
+        });
+
+        // Load categories when page loads
+        document.addEventListener('DOMContentLoaded', loadCategories);
+    </script>
+</body>
+</html> 
